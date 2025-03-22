@@ -1,5 +1,5 @@
 <br>📌 Event Management System<br>
-    <br>A Tkinter-based desktop application that allows users to manage events, store event details in an SQLite database, and generate event reports in Word format using docxtpl.<br>
+    <br>A Tkinter-based desktop application that allows users to manage events, store event details , and generate event reports in Word format using docxtpl.<br>
 
 <br>🛠 Features<br>
   ✅ Add New Events – Store event details in a local SQLite database.<br>
