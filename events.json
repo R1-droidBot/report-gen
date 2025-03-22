@@ -1,24 +1,26 @@
+This is a demo .json file
+
 [
     {
-        "Event Number": "21",
-        "Event Name": "report gen",
-        "Event IC": "done",
-        "Date": "12/21/2025",
-        "Event Type": "talk",
-        "Report Doc": "xyz",
-        "Geo Photo": "zyx",
-        "Attendees": "21",
+        "Event Number": "",
+        "Event Name": "",
+        "Event IC": "",
+        "Date": "",
+        "Event Type": "",
+        "Report Doc": "",
+        "Geo Photo": "",
+        "Attendees": "",
         "Resource Person": "",
-        "Designation": "",
-        "Address": "collage",
-        "Funding": "435677899",
-        "Days": "3",
+        "Designation": ,
+        "Address": "",
+        "Funding": "",
+        "Days": "",
         "Audience": "",
         "Mission Mapping": "",
         "PO-PSO Mapping": "",
         "Attendance Check": "",
         "Permission Docs": "",
         "CO-PO Link": "",
-        "Remarks": "good "
+        "Remarks": ""
     }
 ]
