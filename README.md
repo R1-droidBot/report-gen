@@ -1,4 +1,4 @@
-<br>📌 Event Management System<br>
+<br>📌 Event Report generation <br>
     <br>A Tkinter-based desktop application that allows users to manage events, store event details , and generate event reports in Word format using docxtpl.<br>
 
 <br>🛠 Features<br>
@@ -9,11 +9,11 @@
   ✅ User-Friendly UI – Built with Tkinter and ttk Notebook.<br>
 
 🏗️ Tech Stack<br>
-  <br>Python – Core logic<br>
+  Python – Core logic<br>
   Tkinter – GUI framework<br>
-  SQLite – Database for storing events<br>
   docxtpl – Generate Word reports<br>
   ttk Notebook – Tabbed UI<br>
+  json file - to store data 
 
 📜 Usage<br>
   1️⃣ Open the application.<br>
