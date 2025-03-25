@@ -1,50 +1,92 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from docxtpl import DocxTemplate
+from docxtpl import DocxTemplate, InlineImage
+from docx.shared import Mm
+from PIL import Image, ImageTk
 import json
 import os
+import shutil
+import io
 
 EVENTS_FILE = "events.json"
+IMAGES_FOLDER = "event_images"
 
-# Function to load events from JSON file
+# Ensure images folder exists
+os.makedirs(IMAGES_FOLDER, exist_ok=True)
+
 def load_events():
     if os.path.exists(EVENTS_FILE):
         with open(EVENTS_FILE, "r") as file:
             return json.load(file)
     return []
 
-# Function to save events to JSON file
 def save_events(events):
     with open(EVENTS_FILE, "w") as file:
         json.dump(events, file, indent=4)
 
-# Function to add an event
 def add_event():
     event_data = {label: var.get() for label, var in zip(labels, entry_vars)}
+    
+    # Handle images
+    event_data["images"] = []
+    for img_path in image_paths:
+        if img_path:
+            dest_path = os.path.join(IMAGES_FOLDER, os.path.basename(img_path))
+            shutil.copy(img_path, dest_path)
+            event_data["images"].append(dest_path)
+    
+    if not event_data["Event Number"] or not event_data["Event Name"]:
+        messagebox.showerror("Error", "Event Number and Event Name are required!")
+        return
 
     events = load_events()
+    if any(e["Event Number"] == event_data["Event Number"] for e in events):
+        messagebox.showerror("Error", "Event with this number already exists!")
+        return
+        
     events.append(event_data)
     save_events(events)
-
     messagebox.showinfo("Success", "Event added successfully!")
     clear_fields()
     update_event_list()
 
-# Function to clear input fields
 def clear_fields():
     for var in entry_vars:
         var.set("")
+    image_paths.clear()
+    update_image_preview()
 
-# Function to update event list in the UI
-def update_event_list():
+def update_event_list(search_term=None):
     for row in tree.get_children():
         tree.delete(row)
 
     events = load_events()
     for event in events:
-        tree.insert("", "end", values=(event["Event Number"], event["Event Name"], event["Date"]))
+        if search_term:
+            search_term = search_term.lower()
+            if (search_term in event["Event Number"].lower() or 
+                search_term in event["Event Name"].lower() or 
+                search_term in event["Date"].lower() or
+                search_term in event["Resource Person"].lower() or
+                search_term in event["Event Type"].lower()):
+                tree.insert("", "end", values=(
+                    event["Event Number"],
+                    event["Event Name"],
+                    event["Date"],
+                    event["Resource Person"],
+                    event["Event Type"],
+                    f"{len(event.get('images', []))} images"
+                ))
+        else:
+            tree.insert("", "end", values=(
+                event["Event Number"],
+                event["Event Name"],
+                event["Date"],
+                event["Resource Person"],
+                event["Event Type"],
+                f"{len(event.get('images', []))} images"
+            ))
 
-# Function to generate report for the selected event
 def generate_report():
     selected_item = tree.selection()
     if not selected_item:
@@ -52,7 +94,6 @@ def generate_report():
         return
 
     selected_event_number = tree.item(selected_item, "values")[0]
-
     events = load_events()
     selected_event = next((e for e in events if e["Event Number"] == selected_event_number), None)
     
@@ -65,18 +106,102 @@ def generate_report():
         messagebox.showerror("Error", "Template file not found!")
         return
 
-    doc = DocxTemplate(template_path)
-    doc.render({"event": selected_event})
+    try:
+        doc = DocxTemplate(template_path)
+        context = {"event": selected_event}
+        
+        # Handle images if they exist
+        if "images" in selected_event and selected_event["images"]:
+            context["has_images"] = True
+            # Prepare images for the template
+            for i, img_path in enumerate(selected_event["images"]):
+                if os.path.exists(img_path):
+                    try:
+                        # Create a unique variable name for each image
+                        context[f"image_{i}"] = InlineImage(doc, img_path, width=Mm(50))
+                    except Exception as img_error:
+                        print(f"Skipping image {img_path}: {str(img_error)}")
+                        continue
+        else:
+            context["has_images"] = False
 
-    report_path = filedialog.asksaveasfilename(defaultextension=".docx", filetypes=[("Word Documents", "*.docx")])
-    if report_path:
-        doc.save(report_path)
-        messagebox.showinfo("Success", "Report generated successfully!")
+        doc.render(context)
+        
+        report_path = filedialog.asksaveasfilename(
+            defaultextension=".docx",
+            filetypes=[("Word Documents", "*.docx")]
+        )
+        if report_path:
+            doc.save(report_path)
+            messagebox.showinfo("Success", "Report generated successfully!")
+    
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to generate report: {str(e)}")
+def delete_event():
+    selected_item = tree.selection()
+    if not selected_item:
+        messagebox.showerror("Error", "Please select an event to delete.")
+        return
+
+    selected_event_number = tree.item(selected_item, "values")[0]
+    
+    if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete event {selected_event_number}?"):
+        events = load_events()
+        events = [e for e in events if e["Event Number"] != selected_event_number]
+        save_events(events)
+        update_event_list()
+        messagebox.showinfo("Success", "Event deleted successfully!")
+
+def search_events():
+    search_term = search_var.get()
+    update_event_list(search_term)
+
+def add_images():
+    files = filedialog.askopenfilenames(
+        title="Select Images",
+        filetypes=[("Image Files", "*.jpg *.jpeg *.png *.gif")]
+    )
+    if files:
+        image_paths.extend(files)
+        update_image_preview()
+
+def update_image_preview():
+    # Clear previous previews
+    for widget in image_preview_frame.winfo_children():
+        widget.destroy()
+    
+    # Display new previews
+    for i, img_path in enumerate(image_paths):
+        try:
+            img = Image.open(img_path)
+            img.thumbnail((100, 100))
+            photo = ImageTk.PhotoImage(img)
+            label = tk.Label(image_preview_frame, image=photo)
+            label.image = photo  # Keep a reference
+            label.grid(row=0, column=i, padx=5, pady=5)
+        except Exception as e:
+            print(f"Error loading image preview: {e}")
 
 # GUI Setup
 root = tk.Tk()
 root.title("Event Report Generator")
+root.geometry("1200x800")
 
+# Image handling variables
+image_paths = []
+
+# Create Notebook (tabbed interface)
+notebook = ttk.Notebook(root)
+notebook.pack(fill='both', expand=True)
+
+# Create tabs
+input_tab = ttk.Frame(notebook)
+list_tab = ttk.Frame(notebook)
+
+notebook.add(input_tab, text="Add Event")
+notebook.add(list_tab, text="Event List")
+
+# Input Tab Content - Organized in columns
 labels = ["Event Number", "Event Name", "Event IC", "Date", "Event Type",
           "Report Doc", "Geo Photo", "Attendees", "Resource Person", "Designation",
           "Address", "Funding", "Days", "Audience", "Mission Mapping", "PO-PSO Mapping",
@@ -84,20 +209,98 @@ labels = ["Event Number", "Event Name", "Event IC", "Date", "Event Type",
 
 entry_vars = [tk.StringVar() for _ in labels]
 
-for i, label in enumerate(labels):
-    ttk.Label(root, text=label).grid(row=i, column=0, padx=5, pady=5, sticky="w")
-    ttk.Entry(root, textvariable=entry_vars[i]).grid(row=i, column=1, padx=5, pady=5)
+# Create 3 columns in the input tab
+col1_frame = ttk.Frame(input_tab)
+col2_frame = ttk.Frame(input_tab)
+col3_frame = ttk.Frame(input_tab)
 
-# Buttons
-ttk.Button(root, text="Add Event", command=add_event).grid(row=len(labels), column=0, padx=5, pady=10)
-ttk.Button(root, text="Generate Report", command=generate_report).grid(row=len(labels), column=1, padx=5, pady=10)
+col1_frame.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+col2_frame.pack(side='left', fill='both', expand=True, padx=5, pady=5)
+col3_frame.pack(side='left', fill='both', expand=True, padx=5, pady=5)
 
-# Event List
-tree = ttk.Treeview(root, columns=("Event Number", "Event Name", "Date"), show="headings")
+# Distribute fields across 3 columns
+for i, (label, var) in enumerate(zip(labels, entry_vars)):
+    if i < 7:  # First 7 fields in column 1
+        frame = col1_frame
+    elif i < 14:  # Next 7 fields in column 2
+        frame = col2_frame
+    else:  # Remaining fields in column 3
+        frame = col3_frame
+    
+    ttk.Label(frame, text=label).pack(anchor='w', padx=5, pady=2)
+    ttk.Entry(frame, textvariable=var).pack(fill='x', padx=5, pady=2)
+
+# Image upload section
+image_frame = ttk.Frame(input_tab)
+image_frame.pack(fill='x', padx=5, pady=10)
+
+ttk.Button(image_frame, text="Add Images", command=add_images).pack(side='left', padx=5)
+
+image_preview_frame = ttk.Frame(image_frame)
+image_preview_frame.pack(side='left', fill='x', expand=True)
+
+# Buttons frame at bottom of input tab
+button_frame = ttk.Frame(input_tab)
+button_frame.pack(fill='x', pady=10)
+
+ttk.Button(button_frame, text="Add Event", command=add_event).pack(side='left', padx=20)
+ttk.Button(button_frame, text="Clear Fields", command=clear_fields).pack(side='left', padx=20)
+ttk.Button(button_frame, text="Generate Report", command=generate_report).pack(side='left', padx=20)
+
+# Event List Tab Content
+# Search Frame at top
+search_frame = ttk.Frame(list_tab)
+search_frame.pack(fill='x', padx=5, pady=5)
+
+search_var = tk.StringVar()
+ttk.Label(search_frame, text="Search:").pack(side='left', padx=5)
+search_entry = ttk.Entry(search_frame, textvariable=search_var)
+search_entry.pack(side='left', fill='x', expand=True, padx=5)
+ttk.Button(search_frame, text="Search", command=search_events).pack(side='left', padx=5)
+ttk.Button(search_frame, text="Clear", command=lambda: [search_var.set(""), update_event_list()]).pack(side='left', padx=5)
+
+# Treeview Frame
+tree_frame = ttk.Frame(list_tab)
+tree_frame.pack(fill='both', expand=True, padx=5, pady=5)
+
+# Define columns with widths
+columns = ("Event Number", "Event Name", "Date", "Resource Person", "Event Type", "Images")
+tree = ttk.Treeview(tree_frame, columns=columns, show="headings")
 tree.heading("Event Number", text="Event Number")
 tree.heading("Event Name", text="Event Name")
 tree.heading("Date", text="Date")
-tree.grid(row=len(labels) + 1, column=0, columnspan=2, padx=5, pady=5, sticky="nsew")
+tree.heading("Resource Person", text="Resource Person")
+tree.heading("Event Type", text="Event Type")
+tree.heading("Images", text="Images")
 
+# Set column widths
+tree.column("Event Number", width=120, anchor='center')
+tree.column("Event Name", width=200, anchor='w')
+tree.column("Date", width=100, anchor='center')
+tree.column("Resource Person", width=200, anchor='w')
+tree.column("Event Type", width=150, anchor='w')
+tree.column("Images", width=100, anchor='center')
+
+# Add scrollbars
+v_scroll = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
+h_scroll = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
+tree.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
+
+tree.pack(side='left', fill='both', expand=True)
+v_scroll.pack(side='right', fill='y')
+h_scroll.pack(side='bottom', fill='x')
+
+# Button Frame at bottom
+list_button_frame = ttk.Frame(list_tab)
+list_button_frame.pack(fill='x', pady=5)
+
+ttk.Button(list_button_frame, text="Generate Report", command=generate_report).pack(side='left', padx=20)
+ttk.Button(list_button_frame, text="Delete Event", command=delete_event).pack(side='left', padx=20)
+
+# Initialize the event list
 update_event_list()
+
+# Bind Enter key to search
+search_entry.bind('<Return>', lambda event: search_events())
+
 root.mainloop()
