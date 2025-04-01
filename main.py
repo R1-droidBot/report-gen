@@ -108,23 +108,47 @@ def generate_report():
 
     try:
         doc = DocxTemplate(template_path)
-        context = {"event": selected_event}
         
-        # Handle images if they exist
+        # Create context with all fields
+        context = {
+            'event': {
+                'number': selected_event.get("Event Number", ""),
+                'name': selected_event.get("Event Name", ""),
+                'ic': selected_event.get("Event IC", ""),
+                'date': selected_event.get("Date", ""),
+                'type': selected_event.get("Event Type", ""),
+                'report_doc': selected_event.get("Report Doc", ""),
+                'geo_photo': selected_event.get("Geo Photo", ""),
+                'attendees': selected_event.get("Attendees", ""),
+                'resource_person': selected_event.get("Resource Person", ""),
+                'designation': selected_event.get("Designation", ""),
+                'address': selected_event.get("Address", ""),
+                'funding': selected_event.get("Funding", ""),
+                'days': selected_event.get("Days", ""),
+                'audience': selected_event.get("Audience", ""),
+                'mission_mapping': selected_event.get("Mission Mapping", ""),
+                'po_pso_mapping': selected_event.get("PO-PSO Mapping", ""),
+                'attendance_check': selected_event.get("Attendance Check", ""),
+                'permission_docs': selected_event.get("Permission Docs", ""),
+                'co_po_link': selected_event.get("CO-PO Link", ""),
+                'remarks': selected_event.get("Remarks", "")
+            }
+        }
+        
+        # Handle images
         if "images" in selected_event and selected_event["images"]:
-            context["has_images"] = True
-            # Prepare images for the template
-            for i, img_path in enumerate(selected_event["images"]):
+            context['images'] = []
+            for idx, img_path in enumerate(selected_event["images"]):
                 if os.path.exists(img_path):
                     try:
-                        # Create a unique variable name for each image
-                        context[f"image_{i}"] = InlineImage(doc, img_path, width=Mm(50))
+                        context['images'].append(
+                            InlineImage(doc, img_path, width=Mm(50))
+                        )
+                        context[f'image_{idx}'] = context['images'][-1]
                     except Exception as img_error:
-                        print(f"Skipping image {img_path}: {str(img_error)}")
+                        print(f"Skipping image {img_path}: {img_error}")
                         continue
-        else:
-            context["has_images"] = False
-
+        
         doc.render(context)
         
         report_path = filedialog.asksaveasfilename(
@@ -136,7 +160,8 @@ def generate_report():
             messagebox.showinfo("Success", "Report generated successfully!")
     
     except Exception as e:
-        messagebox.showerror("Error", f"Failed to generate report: {str(e)}")
+        messagebox.showerror("Error", f"Report generation failed: {str(e)}")
+
 def delete_event():
     selected_item = tree.selection()
     if not selected_item:
@@ -170,7 +195,7 @@ def update_image_preview():
     for widget in image_preview_frame.winfo_children():
         widget.destroy()
     
-    # Display new previews
+    # Display new previews in a grid (4 columns)
     for i, img_path in enumerate(image_paths):
         try:
             img = Image.open(img_path)
@@ -178,7 +203,7 @@ def update_image_preview():
             photo = ImageTk.PhotoImage(img)
             label = tk.Label(image_preview_frame, image=photo)
             label.image = photo  # Keep a reference
-            label.grid(row=0, column=i, padx=5, pady=5)
+            label.grid(row=i//4, column=i%4, padx=5, pady=5)
         except Exception as e:
             print(f"Error loading image preview: {e}")
 
@@ -197,9 +222,11 @@ notebook.pack(fill='both', expand=True)
 # Create tabs
 input_tab = ttk.Frame(notebook)
 list_tab = ttk.Frame(notebook)
+upload_tab = ttk.Frame(notebook)  # New tab for image uploads
 
 notebook.add(input_tab, text="Add Event")
 notebook.add(list_tab, text="Event List")
+notebook.add(upload_tab, text="Upload Images")
 
 # Input Tab Content - Organized in columns
 labels = ["Event Number", "Event Name", "Event IC", "Date", "Event Type",
@@ -230,15 +257,6 @@ for i, (label, var) in enumerate(zip(labels, entry_vars)):
     ttk.Label(frame, text=label).pack(anchor='w', padx=5, pady=2)
     ttk.Entry(frame, textvariable=var).pack(fill='x', padx=5, pady=2)
 
-# Image upload section
-image_frame = ttk.Frame(input_tab)
-image_frame.pack(fill='x', padx=5, pady=10)
-
-ttk.Button(image_frame, text="Add Images", command=add_images).pack(side='left', padx=5)
-
-image_preview_frame = ttk.Frame(image_frame)
-image_preview_frame.pack(side='left', fill='x', expand=True)
-
 # Buttons frame at bottom of input tab
 button_frame = ttk.Frame(input_tab)
 button_frame.pack(fill='x', pady=10)
@@ -246,6 +264,17 @@ button_frame.pack(fill='x', pady=10)
 ttk.Button(button_frame, text="Add Event", command=add_event).pack(side='left', padx=20)
 ttk.Button(button_frame, text="Clear Fields", command=clear_fields).pack(side='left', padx=20)
 ttk.Button(button_frame, text="Generate Report", command=generate_report).pack(side='left', padx=20)
+
+# Image Upload Tab Content
+upload_frame = ttk.Frame(upload_tab)
+upload_frame.pack(fill='both', expand=True, padx=10, pady=10)
+
+# Add Images Button
+ttk.Button(upload_frame, text="Select Images", command=add_images).pack(pady=10)
+
+# Image Preview Frame
+image_preview_frame = ttk.Frame(upload_frame)
+image_preview_frame.pack(fill='both', expand=True)
 
 # Event List Tab Content
 # Search Frame at top
