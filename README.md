@@ -2,7 +2,7 @@
     <br>A Tkinter-based desktop application that allows users to manage events, store event details , and generate event reports in Word format using docxtpl.<br>
 
 <br>🛠 Features<br>
-  ✅ Add New Events – Store event details in a local SQLite database.<br>
+  ✅ Add New Events – Store event details in a local database.<br>
   ✅ View Saved Events – Display stored events in a structured format.<br>
   ✅ Upload Images – Attach event-related images.<br>
   ✅ Generate Event Report – Export event details into a formatted Word document (.docx).<br>
