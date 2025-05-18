@@ -1,4 +1,4 @@
-<br>📌 Event Report generation <br> 2025
+<br>📌 Event Report generation <br> [2025]
     <br>A Tkinter-based desktop application that allows users to manage events, store event details , and generate event reports in Word format using docxtpl.<br>
 
 <br>🛠 Features<br>
